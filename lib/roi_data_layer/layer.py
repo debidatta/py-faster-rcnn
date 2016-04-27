@@ -32,9 +32,19 @@ class RoIDataLayer(caffe.Layer):
             inds = np.hstack((
                 np.random.permutation(horz_inds),
                 np.random.permutation(vert_inds)))
-            inds = np.reshape(inds, (-1, 2))
+            #inds = np.reshape(inds, (-1, 2))
+            #row_perm = np.random.permutation(np.arange(inds.shape[0]))
+            #inds = np.reshape(inds[row_perm, :], (-1,))
+            isodd = len(inds) % 2
+            if not isodd:
+                inds = np.reshape(inds, (-1,2))
+            else:
+                tail = inds[-1]
+                inds = np.reshape(inds[:-1], (-1,2))
             row_perm = np.random.permutation(np.arange(inds.shape[0]))
             inds = np.reshape(inds[row_perm, :], (-1,))
+            if isodd:
+                inds = np.append(inds, tail)
             self._perm = inds
         else:
             self._perm = np.random.permutation(np.arange(len(self._roidb)))
@@ -96,7 +106,7 @@ class RoIDataLayer(caffe.Layer):
             max(cfg.TRAIN.SCALES), cfg.TRAIN.MAX_SIZE)
         self._name_to_top_map['data'] = idx
         idx += 1
-
+        
         if cfg.TRAIN.HAS_RPN:
             top[idx].reshape(1, 3)
             self._name_to_top_map['im_info'] = idx
@@ -104,6 +114,14 @@ class RoIDataLayer(caffe.Layer):
 
             top[idx].reshape(1, 4)
             self._name_to_top_map['gt_boxes'] = idx
+            idx += 1
+    
+            top[idx].reshape(1)
+            self._name_to_top_map['pose_a'] = idx
+            idx += 1
+
+            top[idx].reshape(1)
+            self._name_to_top_map['pose_e'] = idx
             idx += 1
         else: # not using RPN
             # rois blob: holds R regions of interest, each is a 5-tuple
@@ -118,7 +136,15 @@ class RoIDataLayer(caffe.Layer):
             top[idx].reshape(1)
             self._name_to_top_map['labels'] = idx
             idx += 1
+            
+            top[idx].reshape(1)
+            self._name_to_top_map['pose_a'] = idx
+            idx += 1
 
+            top[idx].reshape(1)
+            self._name_to_top_map['pose_e'] = idx
+            idx += 1
+     
             if cfg.TRAIN.BBOX_REG:
                 # bbox_targets blob: R bounding-box regression targets with 4
                 # targets per class

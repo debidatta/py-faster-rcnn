@@ -166,6 +166,8 @@ def im_detect(net, im, boxes=None):
     else:
         # use softmax estimated probabilities
         scores = blobs_out['cls_prob']
+        pose_a = blobs_out['pose_a'][:,:].argmax(axis=1)
+        pose_e = blobs_out['pose_e'][:,:].argmax(axis=1) 
 
     if cfg.TEST.BBOX_REG:
         # Apply bounding-box regression deltas
@@ -181,7 +183,7 @@ def im_detect(net, im, boxes=None):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
-    return scores, pred_boxes
+    return scores, pred_boxes, pose_a, pose_e
 
 def vis_detections(im, class_name, dets, thresh=0.3):
     """Visual debugging of detections."""

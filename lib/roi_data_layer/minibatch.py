@@ -11,7 +11,7 @@ import numpy as np
 import numpy.random as npr
 import cv2
 from fast_rcnn.config import cfg
-from utils.blob import prep_im_for_blob, im_list_to_blob
+from utils.blob import *#prep_im_for_blob, im_list_to_blob
 
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
@@ -42,15 +42,26 @@ def get_minibatch(roidb, num_classes):
         blobs['im_info'] = np.array(
             [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],
             dtype=np.float32)
+        pose_a_blob = np.zeros((1), dtype=np.float32)
+        pose_e_blob =  np.zeros((1), dtype=np.float32)
+        full_pose = os.path.basename(roidb[0]['image']).split('_')[2:]#[1:]
+        a = int(full_pose[0][1:])/5
+        e = int(full_pose[1][1:])/5
+        pose_a_blob[0] = a+1
+        pose_e_blob[0] = e+1
+        blobs['pose_a'] = pose_a_blob
+        blobs['pose_e'] = pose_e_blob
     else: # not using RPN
         # Now, build the region of interest and label blobs
         rois_blob = np.zeros((0, 5), dtype=np.float32)
         labels_blob = np.zeros((0), dtype=np.float32)
+        pose_a_blob = np.zeros((0), dtype=np.float32)
+        pose_e_blob =  np.zeros((0), dtype=np.float32)
         bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
         bbox_inside_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
         # all_overlaps = []
         for im_i in xrange(num_images):
-            labels, overlaps, im_rois, bbox_targets, bbox_inside_weights \
+            labels, overlaps, im_rois, bbox_targets, bbox_inside_weights, pose_a, pose_e \
                 = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
                                num_classes)
 
@@ -62,6 +73,8 @@ def get_minibatch(roidb, num_classes):
 
             # Add to labels, bbox targets, and bbox loss blobs
             labels_blob = np.hstack((labels_blob, labels))
+            pose_a_blob = np.hstack((pose_a_blob, pose_a))
+            pose_e_blob = np.hstack((pose_e_blob, pose_e))
             bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
             bbox_inside_blob = np.vstack((bbox_inside_blob, bbox_inside_weights))
             # all_overlaps = np.hstack((all_overlaps, overlaps))
@@ -71,7 +84,8 @@ def get_minibatch(roidb, num_classes):
 
         blobs['rois'] = rois_blob
         blobs['labels'] = labels_blob
-
+        blobs['pose_a'] = pose_a_blob
+        blobs['pose_e'] = pose_e_blob
         if cfg.TRAIN.BBOX_REG:
             blobs['bbox_targets'] = bbox_targets_blob
             blobs['bbox_inside_weights'] = bbox_inside_blob
@@ -120,11 +134,11 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     labels[fg_rois_per_this_image:] = 0
     overlaps = overlaps[keep_inds]
     rois = rois[keep_inds]
-
+    pose_a, pose_e = _get_pose_labels(roidb['image'], len(rois), int(fg_rois_per_this_image))
     bbox_targets, bbox_inside_weights = _get_bbox_regression_labels(
             roidb['bbox_targets'][keep_inds, :], num_classes)
 
-    return labels, overlaps, rois, bbox_targets, bbox_inside_weights
+    return labels, overlaps, rois, bbox_targets, bbox_inside_weights, pose_a, pose_e
 
 def _get_image_blob(roidb, scale_inds):
     """Builds an input blob from the images in the roidb at the specified
@@ -140,6 +154,9 @@ def _get_image_blob(roidb, scale_inds):
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
         im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
                                         cfg.TRAIN.MAX_SIZE)
+        #if roidb[i]['jittered']:
+        #    for j in xrange(3):
+        #        im[:,:,j] = im[:,:,j] * np.random.uniform(0.9,1.1);
         im_scales.append(im_scale)
         processed_ims.append(im)
 
@@ -147,6 +164,25 @@ def _get_image_blob(roidb, scale_inds):
     blob = im_list_to_blob(processed_ims)
 
     return blob, im_scales
+
+#def _get_pose_blobs(roidb):
+#    """Builds an input blob from the images in the roidb at the specified
+#    scales.
+#    """
+#    num_images = len(roidb)
+#    processed_poses_a = []
+#    processed_poses_e = []
+#    im_scales = []
+#    for i in xrange(num_images):
+#        pose_a, pose_e = prep_poses_for_blob(roidb[i]['image'])
+#        processed_poses_a.append(pose_a)
+#        processed_poses_e.append(pose_e)
+#
+    # Create a blob to hold the input images
+#    pose_a_blob = poses_list_to_blob(processed_poses_a)
+#    pose_e_blob = poses_list_to_blob(processed_poses_e)
+ 
+#    return pose_a_blob, pose_e_blob
 
 def _project_im_rois(im_rois, im_scale_factor):
     """Project image RoIs into the rescaled training image."""
@@ -176,6 +212,22 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
         bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
     return bbox_targets, bbox_inside_weights
+
+def _get_pose_labels(im_file, N, number_fg):
+    """Bounding-box regression targets are stored in a compact form in the
+    """
+    pose_a = np.zeros(N, dtype=np.float32)
+    pose_e = np.zeros(N, dtype=np.float32)
+    for ind in xrange(number_fg):
+        full_pose = os.path.basename(im_file).split('_')[1:]
+        a = int(full_pose[0][1:])/5
+        e = int(full_pose[1][1:])/5
+        pose_a[ind] = a+1
+        pose_e[ind] = e+1
+    for ind in xrange(number_fg,N):
+        pose_a[ind] = 0
+        pose_e[ind] = 0 
+    return pose_e, pose_a
 
 def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
     """Visualize a mini-batch for debugging."""

@@ -9,6 +9,7 @@
 
 import numpy as np
 import cv2
+import os
 
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
@@ -43,3 +44,19 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
                     interpolation=cv2.INTER_LINEAR)
 
     return im, im_scale
+
+#def poses_list_to_blob(poses):
+#    num_images = len(poses)
+#    blob = np.zeros((num_images, 1),
+#                    dtype=np.float32)
+#    for i in xrange(num_images):
+#         blob[i, :] = poses[i]
+#    return blob
+#
+#def prep_poses_for_blob(im_file):
+#    full_pose = os.path.basename(im_file).split('_')[1:]
+#    a = int(full_pose[0][1:])/5
+#    e = int(full_pose[1][1:])/5
+#    #e = e/5
+    #d = int(full_pose[1:19])-1
+#    return a,e
