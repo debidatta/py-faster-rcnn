@@ -20,7 +20,7 @@ from voc_eval import voc_eval
 from fast_rcnn.config import cfg
 
 class pascal_voc(imdb):
-    def __init__(self, image_set, year, devkit_path=None):
+    def __init__(self, image_set, year, devkit_path='/media/dey/debidatd/pascal3d/PASCAL/VOCdevkit'):#None):
         imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
@@ -28,11 +28,11 @@ class pascal_voc(imdb):
                             else devkit_path
         self._data_path = os.path.join(self._devkit_path, 'VOC' + self._year)
         self._classes = ('__background__', # always index 0
-                         'aeroplane', 'bicycle', 'bird', 'boat',
-                         'bottle', 'bus', 'car', 'cat', 'chair',
-                         'cow', 'diningtable', 'dog', 'horse',
-                         'motorbike', 'person', 'pottedplant',
-                         'sheep', 'sofa', 'train', 'tvmonitor')
+                         'aeroplane', 'bicycle', 'boat',
+                         'bottle', 'bus', 'car', 'chair',
+                         'diningtable',
+                         'motorbike', 'sofa', 'train', 'tvmonitor')#'person', 'pottedplant',
+                         #'sheep','cat','dog','cow','horse', 'bird'
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
@@ -247,15 +247,18 @@ class pascal_voc(imdb):
             filename = self._get_voc_results_file_template().format(cls)
             with open(filename, 'wt') as f:
                 for im_ind, index in enumerate(self.image_index):
+                    #cls_ind_f = range(
+                    #print len(all_boxes)
+                    #for ii in xrange((cls_ind-1)*24+1,cls_ind*24+1):
                     dets = all_boxes[cls_ind][im_ind]
                     if dets == []:
-                        continue
-                    # the VOCdevkit expects 1-based indices
+                       continue
+                     # the VOCdevkit expects 1-based indices
                     for k in xrange(dets.shape[0]):
                         f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                                format(index, dets[k, -1],
-                                       dets[k, 0] + 1, dets[k, 1] + 1,
-                                       dets[k, 2] + 1, dets[k, 3] + 1))
+                                    format(index, dets[k, -1],
+                                    dets[k, 0] + 1, dets[k, 1] + 1,
+                                    dets[k, 2] + 1, dets[k, 3] + 1))
 
     def _do_python_eval(self, output_dir = 'output'):
         annopath = os.path.join(
@@ -291,8 +294,8 @@ class pascal_voc(imdb):
         print('~~~~~~~~')
         print('Results:')
         for ap in aps:
-            print('{:.3f}'.format(ap))
-        print('{:.3f}'.format(np.mean(aps)))
+            print('{:.3f}'.format(100*ap))
+        print('{:.3f}'.format(100*np.mean(aps)))
         print('~~~~~~~~')
         print('')
         print('--------------------------------------------------------------')

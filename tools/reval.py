@@ -48,7 +48,19 @@ def from_dets(imdb_name, output_dir, args):
     imdb.config['matlab_eval'] = args.matlab_eval
     with open(os.path.join(output_dir, 'detections.pkl'), 'rb') as f:
         dets = cPickle.load(f)
-
+    #pose_file = os.path.join(output_dir, 'detections_pose.txt')
+    #with open(pose_file, 'w') as f:
+    #    for i in xrange(0, len(dets[0])):
+    #        for j in xrange(1, len(dets)):
+    #             det = dets[j][i]
+    #             for d in det:
+    #                  f.write("{:d} {:d} {:.1f} {:.1f} {:.1f} {:.1f} {:.3f} {:.3f} {:.3f}\n".format(i, j,
+    #                           d[0], d[1], d[2], d[3], 15.0*d[4], 15.0*d[5], d[6]))
+    
+    #matlab_cmd = "test_pose_avp('%s');" % (pose_file)
+    #print matlab_cmd
+    #os.system('matlab -nodisplay -r "addpath(\'tools\');%s;quit"' % (matlab_cmd)) 
+    
     if args.apply_nms:
         print 'Applying NMS to all detections'
         nms_dets = apply_nms(dets, cfg.TEST.NMS)

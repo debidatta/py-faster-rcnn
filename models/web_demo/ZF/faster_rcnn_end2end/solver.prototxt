@@ -1,6 +1,6 @@
-train_net: "models/pascal_voc/ZF/faster_rcnn_end2end/train.prototxt"
+train_net: "models/web_demo/ZF/faster_rcnn_end2end/train.prototxt"
 
-base_lr: 0.001
+base_lr: 0.0001
 lr_policy: "step"
 gamma: 0.1
 stepsize: 50000

@@ -167,7 +167,7 @@ def im_detect(net, im, boxes=None):
         # use softmax estimated probabilities
         scores = blobs_out['cls_prob']
         pose_a = blobs_out['pose_a'][:,:].argmax(axis=1)
-        pose_e = blobs_out['pose_e'][:,:].argmax(axis=1) 
+        pose_e = 0#blobs_out['pose_e'][:,:].argmax(axis=1) 
 
     if cfg.TEST.BBOX_REG:
         # Apply bounding-box regression deltas
@@ -185,7 +185,7 @@ def im_detect(net, im, boxes=None):
 
     return scores, pred_boxes, pose_a, pose_e
 
-def vis_detections(im, class_name, dets, thresh=0.3):
+def vis_detections(im, class_name, dets, thresh=0.1):
     """Visual debugging of detections."""
     import matplotlib.pyplot as plt
     im = im[:, :, (2, 1, 0)]
@@ -257,16 +257,22 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
 
         im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
-        scores, boxes = im_detect(net, im, box_proposals)
+        scores, boxes, poses_a, poses_e = im_detect(net, im, box_proposals)
         _t['im_detect'].toc()
 
         _t['misc'].tic()
         # skip j = 0, because it's the background class
         for j in xrange(1, imdb.num_classes):
+            #inds = np.where(np.sum(scores[:, (j-1)*24+1:j*24+1],axis=1) > thresh)[0]
+            #cls_scores = np.sum(scores[inds, (j-1)*24+1:j*24+1] ,axis=1)#scores[inds, j]
             inds = np.where(scores[:, j] > thresh)[0]
             cls_scores = scores[inds, j]
+            cls_poses_a = poses_a[inds]#cls_scores#np.array(len(inds)*[(j-1)%24])#poses_a[inds]
+            cls_poses_e =cls_poses_a# poses_a[inds]#poses_e[inds]
             cls_boxes = boxes[inds, j*4:(j+1)*4]
-            cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
+            cls_dets = np.hstack((cls_boxes, \
+                                  cls_poses_a[:, np.newaxis], cls_poses_e[:, np.newaxis],
+                                  cls_scores[:, np.newaxis])) \
                 .astype(np.float32, copy=False)
             keep = nms(cls_dets, cfg.TEST.NMS)
             cls_dets = cls_dets[keep, :]
@@ -292,6 +298,6 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
     det_file = os.path.join(output_dir, 'detections.pkl')
     with open(det_file, 'wb') as f:
         cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
-
+    
     print 'Evaluating detections'
     imdb.evaluate_detections(all_boxes, output_dir)

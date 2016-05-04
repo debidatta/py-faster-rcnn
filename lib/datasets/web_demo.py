@@ -23,7 +23,8 @@ class web_demo(imdb):
     def __init__(self, image_set, devkit_path=None):
         imdb.__init__(self, image_set)
         self._image_set = image_set
-        self._devkit_path = devkit_path
+        self._devkit_path2 = devkit_path
+        self._devkit_path =  '/media/dey/debidatd/pascal3d/PASCAL/VOCdevkit/'
         self._data_path = ''#os.path.join(self._devkit_path, 'data')
         self._classes = ('__background__', # always index 0
                          'car')
@@ -34,7 +35,7 @@ class web_demo(imdb):
         self._roidb_handler = self.selective_search_roidb
         self._salt = str(uuid.uuid4())
         self._comp_id = 'comp4'
-
+        self._year = '2012'
         # PASCAL specific config options
         self.config = {'cleanup'     : True,
                        'use_salt'    : True,
@@ -70,7 +71,7 @@ class web_demo(imdb):
         """
         # Example path to image set file:
         # self._devkit_path + /VOCdevkit2007/VOC2007/ImageSets/Main/val.txt
-        image_set_file = os.path.join(self._devkit_path,
+        image_set_file = os.path.join(self._devkit_path2,
                                       self._image_set + '.txt')
         assert os.path.exists(image_set_file), \
                 'Path does not exist: {}'.format(image_set_file)
@@ -249,17 +250,20 @@ class web_demo(imdb):
                                        dets[k, 2] + 1, dets[k, 3] + 1))
 
     def _do_python_eval(self, output_dir = 'output'):
+        #self._year = '2012'
         annopath = os.path.join(
             self._devkit_path,
             'VOC' + self._year,
             'Annotations',
             '{:s}.xml')
-        imagesetfile = os.path.join(
-            self._devkit_path,
-            'VOC' + self._year,
-            'ImageSets',
-            'Main',
-            self._image_set + '.txt')
+        #imagesetfile = os.path.join(
+        #    self._devkit_path,
+        #    'VOC' + self._year,
+        #    'ImageSets',
+        #    'Main',
+        #    self._image_set + '.txt')
+        imagesetfile = os.path.join(self._devkit_path2,
+                       self._image_set + '.txt')
         cachedir = os.path.join(self._devkit_path, 'annotations_cache')
         aps = []
         # The PASCAL VOC metric changed in 2010

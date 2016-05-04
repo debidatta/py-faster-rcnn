@@ -79,7 +79,7 @@ class SolverWrapper(object):
                  if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
         filename = (self.solver_param.snapshot_prefix + infix +
                     '_iter_{:d}'.format(self.solver.iter) + '.caffemodel')
-        filename = os.path.join(self.output_dir, filename)
+        filename = os.path.join('/media/dey/debidatd/caffemodels', filename) #os.path.join(self.output_dir, filename)
 
         net.save(str(filename))
         print 'Wrote snapshot to: {:s}'.format(filename)

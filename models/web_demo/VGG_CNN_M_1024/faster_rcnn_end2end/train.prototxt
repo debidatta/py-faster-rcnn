@@ -5,12 +5,10 @@ layer {
   top: 'data'
   top: 'im_info'
   top: 'gt_boxes'
-  top: 'pose_a_o'
-  top: 'pose_e_o'
   python_param {
     module: 'roi_data_layer.layer'
     layer: 'RoIDataLayer'
-    param_str: "'num_classes': 2"
+    param_str: "'num_classes': 289"
   }
 }
 layer {
@@ -332,19 +330,18 @@ layer {
   type: 'Python'
   bottom: 'rpn_rois'
   bottom: 'gt_boxes'
-  bottom: 'pose_a_o'
-  bottom: 'pose_e_o'
   top: 'rois'
   top: 'labels'
   top: 'pose_a'
   top: 'pose_e'
+  top: 'pose_t'
   top: 'bbox_targets'
   top: 'bbox_inside_weights'
   top: 'bbox_outside_weights'
   python_param {
     module: 'rpn.proposal_target_layer'
     layer: 'ProposalTargetLayer'
-    param_str: "'num_classes': 2"
+    param_str: "'num_classes': 289"
   }
 }
 
@@ -422,6 +419,45 @@ layer {
     dropout_ratio: 0.5
   }
 }
+
+#layer {
+#  name: "fc7_pose"
+#  type: "InnerProduct"
+#  bottom: "fc6"
+#  top: "fc7_pose"
+#  param {
+#    lr_mult: 1
+#  }
+#  param {
+#    lr_mult: 2
+#  }
+#  inner_product_param {
+#    num_output: 1024
+#    weight_filler {
+#      type: "gaussian"
+#      std: 0.001
+#    }
+#    bias_filler {
+#      type: "constant"
+#      value: 0
+#    }
+#  }
+#}
+#layer {
+#  name: "relu7"
+#  type: "ReLU"
+#  bottom: "fc7_pose"
+#  top: "fc7_pose"
+#}
+#layer {
+#  name: "drop7_pose"
+#  type: "Dropout"
+#  bottom: "fc7_pose"
+#  top: "fc7_pose"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#  }
+#}
 layer {
   name: "cls_score"
   type: "InnerProduct"
@@ -434,7 +470,7 @@ layer {
     lr_mult: 2
   }
   inner_product_param {
-    num_output: 2
+    num_output: 289
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -457,7 +493,7 @@ layer {
     lr_mult: 2
   }
   inner_product_param {
-    num_output: 8
+    num_output: 1156
     weight_filler {
       type: "gaussian"
       std: 0.001
@@ -468,40 +504,56 @@ layer {
     }
   }
 }
-layer {
-  bottom: "fc7"
-  top: "fc8_pose_a"
-  name: "fc8_pose_a"
-  type: "InnerProduct"
-  inner_product_param {
-    num_output: 72
-  }
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
-}
-layer {
-  bottom: "fc7"
-  top: "fc8_pose_e"
-  name: "fc8_pose_e"
-  type: "InnerProduct"
-  inner_product_param {
-    num_output: 19
-  }
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
-}
+#layer {
+#  bottom: "fc7"
+#  top: "fc8_pose_a"
+#  name: "fc8_pose_a"
+#  type: "InnerProduct"
+#  inner_product_param {
+#    num_output: 24
+#    weight_filler {
+#      type: "gaussian"
+#      std: 0.001
+#    }
+#    bias_filler {
+#      type: "constant"
+#      value: 0
+#    }
+#  }
+#  param {
+#    lr_mult: 1
+#    decay_mult: 1
+#  }
+#  param {
+#    lr_mult: 2
+#    decay_mult: 0
+#  }
+#}
+#layer {
+#  bottom: "fc7_pose"
+#  top: "fc8_pose_e"
+#  name: "fc8_pose_e"
+#  type: "InnerProduct"
+#  inner_product_param {
+#    num_output: 24
+#    weight_filler {
+#      type: "gaussian"
+#      std: 0.001
+#    }
+#    bias_filler {
+#      type: "constant"
+#      value: 0
+#    }
+#  }
+#  param {
+#    lr_mult: 1
+#    decay_mult: 1
+#  }
+#  param {
+#    lr_mult: 2
+#    decay_mult: 0
+#  }
+#}
 layer {
   name: "loss_cls"
   type: "SoftmaxWithLoss"
@@ -522,31 +574,38 @@ layer {
   top: "loss_bbox"
   loss_weight: 1
 }
+#layer {
+#  name: "pose_a_loss"
+#  top: "pose_a_loss"
+#  type: "SoftmaxWithLoss"
+#  bottom: "fc8_pose_a"
+#  bottom: "pose_a"
+#  propagate_down: 1
+#  propagate_down: 0
+#  loss_weight: 1
+#  loss_param {
+#    ignore_label: -1
+#    normalize: true
+#  }
+#}
+#layer {
+#  name: "pose_e_loss"
+#  top: "pose_e_loss"
+#  type: "SoftmaxWithLoss"
+#  bottom: "fc8_pose_e"
+#  bottom: "pose_e"
+#  propagate_down: 1
+#  propagate_down: 0
+#  loss_weight: 1
+#  loss_param {
+#    ignore_label: -1
+#    normalize: true
+#  }
+#}
 layer {
-  name: "pose_a_loss"
-  top: "pose_a_loss"
-  type: "SoftmaxWithLoss"
-  bottom: "fc8_pose_a"
+  name: "silence_layer"
+  type: "Silence"
   bottom: "pose_a"
-  propagate_down: 1
-  propagate_down: 0
-  loss_weight: 1
-  loss_param {
-    ignore_label: -1
-    normalize: true
-  }
-}
-layer {
-  name: "pose_e_loss"
-  top: "pose_e_loss"
-  type: "SoftmaxWithLoss"
-  bottom: "fc8_pose_e"
+  bottom: "pose_t"
   bottom: "pose_e"
-  propagate_down: 1
-  propagate_down: 0
-  loss_weight: 1
-  loss_param {
-    ignore_label: -1
-    normalize: true
-  }
 }

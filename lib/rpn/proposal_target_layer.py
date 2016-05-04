@@ -24,19 +24,19 @@ class ProposalTargetLayer(caffe.Layer):
     def setup(self, bottom, top):
         layer_params = yaml.load(self.param_str_)
         self._num_classes = layer_params['num_classes']
-        print len(top)
         # sampled rois (0, x1, y1, x2, y2)
         top[0].reshape(1, 5)
         # labels
         top[1].reshape(1, 1)
         top[2].reshape(1, 1)
         top[3].reshape(1, 1) 
+        top[4].reshape(1, 1)
         # bbox_targets
-        top[4].reshape(1, self._num_classes * 4)
-        # bbox_inside_weights
         top[5].reshape(1, self._num_classes * 4)
-        # bbox_outside_weights
+        # bbox_inside_weights
         top[6].reshape(1, self._num_classes * 4)
+        # bbox_outside_weights
+        top[7].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
@@ -46,12 +46,10 @@ class ProposalTargetLayer(caffe.Layer):
         # TODO(rbg): it's annoying that sometimes I have extra info before
         # and other times after box coordinates -- normalize to one format
         gt_boxes = bottom[1].data
-        pose_a_o = bottom[2].data
-        pose_e_o = bottom[3].data 
         # Include ground-truth boxes in the set of candidate rois
         zeros = np.zeros((gt_boxes.shape[0], 1), dtype=gt_boxes.dtype)
         all_rois = np.vstack(
-            (all_rois, np.hstack((zeros, gt_boxes[:, :-1])))
+            (all_rois, np.hstack((zeros, gt_boxes[:, :4])))
         )
 
         # Sanity check: single batch only
@@ -67,9 +65,9 @@ class ProposalTargetLayer(caffe.Layer):
         #labels, rois, bbox_targets, bbox_inside_weights = _sample_rois(
         #    all_rois, gt_boxes, fg_rois_per_image,
         #    rois_per_image, self._num_classes)
-        labels, rois, bbox_targets, bbox_inside_weights, pose_a, pose_e \
+        labels, rois, bbox_targets, bbox_inside_weights, pose_a, pose_e, pose_t \
                 = _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image,
-                               self._num_classes, pose_a_o, pose_e_o)
+                               self._num_classes)#, pose_a_o, pose_e_o)
 
         if DEBUG:
             print 'num fg: {}'.format((labels > 0).sum())
@@ -94,17 +92,20 @@ class ProposalTargetLayer(caffe.Layer):
 
         top[3].reshape(*pose_e.shape)
         top[3].data[...] = pose_e
+      
+        top[4].reshape(*pose_t.shape)
+        top[4].data[...] = pose_t
         # bbox_targets
-        top[4].reshape(*bbox_targets.shape)
-        top[4].data[...] = bbox_targets
+        top[5].reshape(*bbox_targets.shape)
+        top[5].data[...] = bbox_targets
 
         # bbox_inside_weights
-        top[5].reshape(*bbox_inside_weights.shape)
-        top[5].data[...] = bbox_inside_weights
+        top[6].reshape(*bbox_inside_weights.shape)
+        top[6].data[...] = bbox_inside_weights
 
         # bbox_outside_weights
-        top[6].reshape(*bbox_inside_weights.shape)
-        top[6].data[...] = np.array(bbox_inside_weights > 0).astype(np.float32)
+        top[7].reshape(*bbox_inside_weights.shape)
+        top[7].data[...] = np.array(bbox_inside_weights > 0).astype(np.float32)
 
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""
@@ -137,22 +138,8 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         end = start + 4
         bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
         bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
+
     return bbox_targets, bbox_inside_weights
-
-def _get_pose_labels(a, e, N, number_fg):
-    """Bounding-box regression targets are stored in a compact form in the
-    """
-    pose_a = np.zeros(N, dtype=np.float32)
-    pose_e = np.zeros(N, dtype=np.float32)
-    for ind in xrange(number_fg):
-        pose_a[ind] = a#+1
-        pose_e[ind] = e#+1
-    for ind in xrange(number_fg,N):
-        pose_a[ind] = -1#0
-        pose_e[ind] = -1#0 
-    return pose_a, pose_e
-
-
 def _compute_targets(ex_rois, gt_rois, labels):
     """Compute bounding-box regression targets for an image."""
 
@@ -168,7 +155,7 @@ def _compute_targets(ex_rois, gt_rois, labels):
     return np.hstack(
             (labels[:, np.newaxis], targets)).astype(np.float32, copy=False)
 
-def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_classes, pose_a, pose_e):
+def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_classes):#, pose_a, pose_e):
     """Generate a random sample of RoIs comprising foreground and background
     examples.
     """
@@ -179,7 +166,9 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     gt_assignment = overlaps.argmax(axis=1)
     max_overlaps = overlaps.max(axis=1)
     labels = gt_boxes[gt_assignment, 4]
-
+    poses_a = gt_boxes[gt_assignment, 5]
+    poses_e = gt_boxes[gt_assignment, 6]
+    poses_t = gt_boxes[gt_assignment, 7]
     # Select foreground RoIs as those with >= FG_THRESH overlap
     fg_inds = np.where(max_overlaps >= cfg.TRAIN.FG_THRESH)[0]
     # Guard against the case when an image has fewer than fg_rois_per_image
@@ -204,14 +193,21 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     keep_inds = np.append(fg_inds, bg_inds)
     # Select sampled values from various arrays:
     labels = labels[keep_inds]
+    poses_a = poses_a[keep_inds]
+    poses_e = poses_e[keep_inds]
+    poses_t = poses_t[keep_inds]
+    #for p in xrange(int(fg_rois_per_this_image)):
+    #    labels[p] = (labels[p]-1) * 24 + poses_a[p]+1 
     # Clamp labels for the background RoIs to 0
     labels[fg_rois_per_this_image:] = 0
+    poses_a[fg_rois_per_this_image:] = -1
+    poses_e[fg_rois_per_this_image:] = -1
+    poses_t[fg_rois_per_this_image:] = -1
     rois = all_rois[keep_inds]
-    pose_a, pose_e = _get_pose_labels(pose_a, pose_e, len(rois), int(fg_rois_per_this_image))
+    print zip(labels,poses_a)
+    #pose_a, pose_e = _get_pose_labels(pose_a, pose_e, len(rois), int(fg_rois_per_this_image))
     bbox_target_data = _compute_targets(
         rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], :4], labels)
 
-    bbox_targets, bbox_inside_weights = \
-        _get_bbox_regression_labels(bbox_target_data, num_classes)
-
-    return labels, rois, bbox_targets, bbox_inside_weights, pose_a, pose_e
+    bbox_targets, bbox_inside_weights = _get_bbox_regression_labels(bbox_target_data, num_classes)
+    return labels, rois, bbox_targets, bbox_inside_weights, poses_a, poses_e, poses_t

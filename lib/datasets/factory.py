@@ -10,8 +10,9 @@
 __sets = {}
 
 from datasets.pascal_voc import pascal_voc
-from datasets.coco import coco
+#from datasets.coco import coco
 from datasets.web_demo import web_demo
+from datasets.pascal_3d import pascal_3d
 import numpy as np
 
 # Set up voc_<year>_<split> using selective search "fast" mode
@@ -32,10 +33,15 @@ for year in ['2015']:
         name = 'coco_{}_{}'.format(year, split)
         __sets[name] = (lambda split=split, year=year: coco(split, year))
 
-web_demo_path = '/home/debidatd/chairs/'
+web_demo_path = '/media/dey/debidatd/renderforcnn/cars/'#irs/'
 for split in ['train', 'test']:
     name = '{}_{}'.format('web_demo', split)
     __sets[name] = (lambda split=split: web_demo(split, web_demo_path))
+
+pascal_3d_path = '/media/dey/debidatd/pascal3d/'#irs/'
+for split in ['train', 'test']:
+    name = '{}_{}'.format('pascal_3d', split)
+    __sets[name] = (lambda split=split: pascal_3d(split, pascal_3d))
 
 def get_imdb(name):
     """Get an imdb (image database) by name."""

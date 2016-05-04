@@ -35,22 +35,26 @@ def get_minibatch(roidb, num_classes):
         assert len(roidb) == 1, "Single batch only"
         # gt boxes: (x1, y1, x2, y2, cls)
         gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
-        gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
+        gt_boxes = np.empty((len(gt_inds), 8), dtype=np.float32)
         gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
         gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
+        gt_boxes[:, 5] = roidb[0]['pose_a'][gt_inds, :].ravel()
+        gt_boxes[:, 6] = roidb[0]['pose_e'][gt_inds, :].ravel()
+        gt_boxes[:, 7] = roidb[0]['pose_t'][gt_inds, :].ravel()
         blobs['gt_boxes'] = gt_boxes
         blobs['im_info'] = np.array(
             [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],
             dtype=np.float32)
-        pose_a_blob = np.zeros((1), dtype=np.float32)
-        pose_e_blob =  np.zeros((1), dtype=np.float32)
-        full_pose = os.path.basename(roidb[0]['image']).split('_')[2:]#[1:]
-        a = int(full_pose[0][1:])/5
-        e = int(full_pose[1][1:])/5
-        pose_a_blob[0] = a+1
-        pose_e_blob[0] = e+1
-        blobs['pose_a'] = pose_a_blob
-        blobs['pose_e'] = pose_e_blob
+        _vis_minibatch(im_blob, gt_boxes)
+        #pose_a_blob = np.zeros((1), dtype=np.float32)
+        #pose_e_blob =  np.zeros((1), dtype=np.float32)
+        #full_pose = os.path.basename(roidb[0]['image']).split('_')[2:]#[1:]
+        #a = int(full_pose[0][1:])/5
+        #e = int(full_pose[1][1:])/5
+        #pose_a_blob[0] = a+1
+        #pose_e_blob[0] = e+1
+        #blobs['pose_a'] = pose_a_blob
+        #blobs['pose_e'] = pose_e_blob
     else: # not using RPN
         # Now, build the region of interest and label blobs
         rois_blob = np.zeros((0, 5), dtype=np.float32)
@@ -59,7 +63,7 @@ def get_minibatch(roidb, num_classes):
         pose_e_blob =  np.zeros((0), dtype=np.float32)
         bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
         bbox_inside_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
-        # all_overlaps = []
+        #all_overlaps = []
         for im_i in xrange(num_images):
             labels, overlaps, im_rois, bbox_targets, bbox_inside_weights, pose_a, pose_e \
                 = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
@@ -77,10 +81,11 @@ def get_minibatch(roidb, num_classes):
             pose_e_blob = np.hstack((pose_e_blob, pose_e))
             bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
             bbox_inside_blob = np.vstack((bbox_inside_blob, bbox_inside_weights))
-            # all_overlaps = np.hstack((all_overlaps, overlaps))
+           # all_overlaps = np.hstack((all_overlaps, overlaps))
 
         # For debug visualizations
-        # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
+        #_vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
+        
 
         blobs['rois'] = rois_blob
         blobs['labels'] = labels_blob
@@ -229,20 +234,20 @@ def _get_pose_labels(im_file, N, number_fg):
         pose_e[ind] = 0 
     return pose_e, pose_a
 
-def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
+def _vis_minibatch(im_blob, gt_boxes):#rois_blob, labels_blob, overlaps, pose_a, pose_e):
     """Visualize a mini-batch for debugging."""
     import matplotlib.pyplot as plt
-    for i in xrange(rois_blob.shape[0]):
-        rois = rois_blob[i, :]
-        im_ind = rois[0]
-        roi = rois[1:]
-        im = im_blob[im_ind, :, :, :].transpose((1, 2, 0)).copy()
+    for i in xrange(gt_boxes.shape[0]):
+        rois = gt_boxes[i,:4]#rois_blob[i, :]
+        #im_ind = rois[0]
+        roi = rois[:]
+        im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
         im += cfg.PIXEL_MEANS
         im = im[:, :, (2, 1, 0)]
         im = im.astype(np.uint8)
-        cls = labels_blob[i]
+        cls = gt_boxes[i,4]#labels_blob[i]
         plt.imshow(im)
-        print 'class: ', cls, ' overlap: ', overlaps[i]
+        print 'class: ', cls,'posea:', gt_boxes[i, 5], 'posee:', gt_boxes[i, 6]
         plt.gca().add_patch(
             plt.Rectangle((roi[0], roi[1]), roi[2] - roi[0],
                           roi[3] - roi[1], fill=False,
